@@ -546,7 +546,7 @@ class IndividuoPG:
             return self.criar_folha()
         
         # OPERADORES DISPONÍVEIS PARA O ALUNO MODIFICAR
-        operador = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo'])
+        operador = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo', 'sin', 'cos', 'sigmoid'])
         if operador in ['+', '-', '*', '/']:
             return {
                 'tipo': 'operador',
@@ -568,13 +568,17 @@ class IndividuoPG:
                 'esquerda': IndividuoPG(self.profundidade - 1).arvore_aceleracao,
                 'direita': None
             }
-        else:  # if_positivo ou if_negativo
+        else:  # if_positivo ou if_negativo, sin, cos, sigmoid
             return {
                 'tipo': 'operador',
                 'operador': operador,
                 'esquerda': IndividuoPG(self.profundidade - 1).arvore_aceleracao,
                 'direita': IndividuoPG(self.profundidade - 1).arvore_aceleracao
             }
+
+    @staticmethod
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
     
     def criar_folha(self):
         # VARIÁVEIS DISPONÍVEIS PARA O ALUNO MODIFICAR
@@ -632,8 +636,14 @@ class IndividuoPG:
             return esquerda / direita if direita != 0 else 0
         elif no['operador'] == 'max':
             return max(esquerda, direita)
-        else:  # min
+        elif no['operador'] == 'min':
             return min(esquerda, direita)
+        elif no['operador'] == 'sin':
+            return np.sin(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'cos':
+            return np.cos(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'sigmoid':
+            return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
     
     def mutacao(self, probabilidade=0.1):
         # PROBABILIDADE DE MUTAÇÃO PARA O ALUNO MODIFICAR
