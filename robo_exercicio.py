@@ -578,7 +578,13 @@ class IndividuoPG:
 
     @staticmethod
     def sigmoid(x):
-        return 1 / (1 + np.exp(-x))
+        # Versão mais robusta da sigmoid que evita overflow
+        if x >= 0:
+            z = np.exp(-x)
+            return 1 / (1 + z)
+        else:
+            z = np.exp(x)
+            return z / (1 + z)
     
     @staticmethod
     def tanh(x):
@@ -710,7 +716,7 @@ class IndividuoPG:
             return individuo
 
 class ProgramacaoGenetica:
-    def __init__(self, tamanho_populacao=50, profundidade=3):
+    def __init__(self, tamanho_populacao=100, profundidade=4):
         # PARÂMETROS PARA O ALUNO MODIFICAR
         self.tamanho_populacao = tamanho_populacao
         self.profundidade = profundidade
@@ -752,21 +758,23 @@ class ProgramacaoGenetica:
                 
                 # Calcular fitness
                 fitness_tentativa = (
-                        robo.recursos_coletados * 100 +  # Recursos coletados
-                        robo.distancia_percorrida * 0.05 -  # Distância percorrida
-                        robo.colisoes * 20 -  # Penalidade por colisões
-                        (100 - robo.energia) * 1 +  # Penalidade por energia consumida.
-                        (1000 if robo.meta_atingida else 0) +  # Bônus por atingir meta
-                        (10 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
-                    )
+                    robo.recursos_coletados * 150 +  # Aumentado o peso dos recursos
+                    robo.distancia_percorrida * 0.1 -  # Aumentado o peso da distância
+                    robo.colisoes * 30 -  # Aumentada a penalidade por colisões
+                    (100 - robo.energia) * 0.5 +  # Reduzida a penalidade por energia
+                    (800 if robo.meta_atingida else 0) +  # Bônus por atingir meta
+                    (15 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
+                )
                 
-                # Adicionar pontos extras por atingir a meta
+                # Adicionar pontos extras por atingir a meta e continuar coletando recursos
                 if robo.meta_atingida:
-                    fitness_tentativa += 500  # Pontos extras por atingir a meta
+                    fitness_tentativa += 300  # Pontos extras por atingir a meta
+                    # Bônus adicional por coletar recursos após atingir a meta
+                    fitness_tentativa += robo.recursos_coletados * 200
                 
                 fitness += max(0, fitness_tentativa)
             
-            individuo.fitness = fitness / 10  # Média das 5 tentativas
+            individuo.fitness = fitness / 5  # Média das 5 tentativas
             
             # Atualizar melhor indivíduo
             if individuo.fitness > self.melhor_fitness:
@@ -776,7 +784,7 @@ class ProgramacaoGenetica:
     def selecionar(self):
         # MÉTODO DE SELEÇÃO PARA O ALUNO MODIFICAR
         # Seleção por torneio
-        tamanho_torneio = 3  # TAMANHO DO TORNEIO PARA O ALUNO MODIFICAR
+        tamanho_torneio = 5  # Aumentado o tamanho do torneio
         selecionados = []
         
         for _ in range(self.tamanho_populacao):
@@ -817,7 +825,7 @@ if __name__ == "__main__":
     # Criar e treinar o algoritmo genético
     print("Treinando o algoritmo genético...")
     # PARÂMETROS PARA O ALUNO MODIFICAR
-    pg = ProgramacaoGenetica(tamanho_populacao=50, profundidade=4)
+    pg = ProgramacaoGenetica(tamanho_populacao=100, profundidade=4)
     melhor_individuo, historico = pg.evoluir(n_geracoes=10)
     
     # Salvar o melhor indivíduo
