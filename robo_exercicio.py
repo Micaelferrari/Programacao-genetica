@@ -546,7 +546,7 @@ class IndividuoPG:
             return self.criar_folha()
         
         # OPERADORES DISPONÍVEIS PARA O ALUNO MODIFICAR
-        operador = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo', 'sin', 'cos', 'sigmoid'])
+        operador = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo', 'sin', 'cos', 'sigmoid', 'tanh'])
         if operador in ['+', '-', '*', '/']:
             return {
                 'tipo': 'operador',
@@ -568,7 +568,7 @@ class IndividuoPG:
                 'esquerda': IndividuoPG(self.profundidade - 1).arvore_aceleracao,
                 'direita': None
             }
-        else:  # if_positivo ou if_negativo, sin, cos, sigmoid
+        else:  # if_positivo ou if_negativo, sin, cos, sigmoid, tanh
             return {
                 'tipo': 'operador',
                 'operador': operador,
@@ -579,6 +579,10 @@ class IndividuoPG:
     @staticmethod
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
+    
+    @staticmethod
+    def tanh(x):
+        return np.tanh(x)
     
     def criar_folha(self):
         # VARIÁVEIS DISPONÍVEIS PARA O ALUNO MODIFICAR
@@ -644,6 +648,8 @@ class IndividuoPG:
             return np.cos(self.avaliar_no(no['esquerda'], sensores))
         elif no['operador'] == 'sigmoid':
             return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'tanh':
+            return self.tanh(self.avaliar_no(no['esquerda'], sensores))
     
     def mutacao(self, probabilidade=0.1):
         # PROBABILIDADE DE MUTAÇÃO PARA O ALUNO MODIFICAR
@@ -760,7 +766,7 @@ class ProgramacaoGenetica:
                 
                 fitness += max(0, fitness_tentativa)
             
-            individuo.fitness = fitness / 5  # Média das 5 tentativas
+            individuo.fitness = fitness / 10  # Média das 5 tentativas
             
             # Atualizar melhor indivíduo
             if individuo.fitness > self.melhor_fitness:
