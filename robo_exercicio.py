@@ -780,36 +780,23 @@ class ProgramacaoGenetica:
         
         return selecionados
     
-    def evoluir(self, n_geracoes=50):
-        # NÚMERO DE GERAÇÕES PARA O ALUNO MODIFICAR
+    def evoluir(self, n_geracoes=20):
         for geracao in range(n_geracoes):
             print(f"Geração {geracao + 1}/{n_geracoes}")
-            
+            # Calcular probabilidade de mutação adaptativa
+            prob_mutacao = 0.3 - (0.25 * geracao / (n_geracoes - 1))
             # Avaliar população
             self.avaliar_populacao()
-            
-            # Registrar melhor fitness
             self.historico_fitness.append(self.melhor_fitness)
             print(f"Melhor fitness: {self.melhor_fitness:.2f}")
-            
-            # Selecionar indivíduos
             selecionados = self.selecionar()
-            
-            # Criar nova população
-            nova_populacao = []
-            
-            # Elitismo - manter o melhor indivíduo
-            nova_populacao.append(self.melhor_individuo)
-            
-            # Preencher o resto da população
+            nova_populacao = [self.melhor_individuo]
             while len(nova_populacao) < self.tamanho_populacao:
                 pai1, pai2 = random.sample(selecionados, 2)
                 filho = pai1.crossover(pai2)
-                filho.mutacao(probabilidade=0.1)  # PROBABILIDADE DE MUTAÇÃO PARA O ALUNO MODIFICAR
+                filho.mutacao(probabilidade=prob_mutacao)
                 nova_populacao.append(filho)
-            
             self.populacao = nova_populacao
-        
         return self.melhor_individuo, self.historico_fitness
 
 # =====================================================================
