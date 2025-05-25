@@ -761,7 +761,7 @@ class IndividuoPG:
             return individuo
 
 class ProgramacaoGenetica:
-    def __init__(self, tamanho_populacao=100, profundidade=4):
+    def __init__(self, tamanho_populacao=150, profundidade=5):
         # PARÂMETROS PARA O ALUNO MODIFICAR
         self.tamanho_populacao = tamanho_populacao
         self.profundidade = profundidade
@@ -779,8 +779,8 @@ class ProgramacaoGenetica:
             individuo.limpar_cache()
             fitness = 0
             
-            # Simular 5 tentativas
-            for _ in range(5):
+            # Simular 8 tentativas (aumentado de 5 para 8)
+            for _ in range(8):
                 ambiente.reset()
                 robo.reset(ambiente.largura // 2, ambiente.altura // 2)
                 
@@ -805,23 +805,23 @@ class ProgramacaoGenetica:
                 
                 # Calcular fitness
                 fitness_tentativa = (
-                    robo.recursos_coletados * 200 +  # Aumentado significativamente o peso dos recursos
-                    robo.distancia_percorrida * 0.02 -  # Reduzido o peso da distância para evitar movimento desnecessário
-                    robo.colisoes * 100 -  # Aumentada a penalidade por colisões para evitar comportamentos arriscados
-                    (100 - robo.energia) * 0.3 +  # Reduzida a penalidade por energia para permitir mais exploração
-                    (1000 if robo.meta_atingida else 0) +  # Aumentado o bônus por atingir meta
-                    (20 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Aumentado o bônus por eficiência temporal
+                    robo.recursos_coletados * 250 +  # Aumentado o peso dos recursos
+                    robo.distancia_percorrida * 0.01 -  # Reduzido o peso da distância
+                    robo.colisoes * 150 -  # Aumentada a penalidade por colisões
+                    (100 - robo.energia) * 0.2 +  # Reduzida a penalidade por energia
+                    (600 if robo.meta_atingida else 0) +  # Bônus por atingir meta
+                    (25 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
                 )
                 
                 # Adicionar pontos extras por atingir a meta e continuar coletando recursos
                 if robo.meta_atingida:
-                    fitness_tentativa += 300  # Aumentado o bônus por atingir a meta
+                    fitness_tentativa += 400  # Pontos extras por atingir a meta
                     # Bônus adicional por coletar recursos após atingir a meta
-                    fitness_tentativa += robo.recursos_coletados * 300  # Aumentado o bônus por recursos após meta
+                    fitness_tentativa += robo.recursos_coletados * 350
                 
                 fitness += max(0, fitness_tentativa)
             
-            individuo.fitness = fitness / 5  # Média das 5 tentativas
+            individuo.fitness = fitness / 8  # Média das 8 tentativas
             
             # Atualizar melhor indivíduo
             if individuo.fitness > self.melhor_fitness:
@@ -831,7 +831,7 @@ class ProgramacaoGenetica:
     def selecionar(self):
         # MÉTODO DE SELEÇÃO PARA O ALUNO MODIFICAR
         # Seleção por torneio
-        tamanho_torneio = 7  # Aumentado o tamanho do torneio para seleção mais rigorosa
+        tamanho_torneio = 8  # Aumentado o tamanho do torneio
         selecionados = []
         
         for _ in range(self.tamanho_populacao):
@@ -845,7 +845,7 @@ class ProgramacaoGenetica:
         for geracao in range(n_geracoes):
             print(f"Geração {geracao + 1}/{n_geracoes}")
             # Calcular probabilidade de mutação adaptativa
-            prob_mutacao = 0.4 - (0.35 * geracao / (n_geracoes - 1))  # Aumentada a probabilidade inicial e a redução
+            prob_mutacao = 0.5 - (0.45 * geracao / (n_geracoes - 1))  # Aumentada a probabilidade inicial e a redução
             # Avaliar população
             self.avaliar_populacao()
             self.historico_fitness.append(self.melhor_fitness)
@@ -872,8 +872,8 @@ if __name__ == "__main__":
     # Criar e treinar o algoritmo genético
     print("Treinando o algoritmo genético...")
     # PARÂMETROS PARA O ALUNO MODIFICAR
-    pg = ProgramacaoGenetica(tamanho_populacao=100, profundidade=4)
-    melhor_individuo, historico = pg.evoluir(n_geracoes=10)
+    pg = ProgramacaoGenetica(tamanho_populacao=150, profundidade=5)
+    melhor_individuo, historico = pg.evoluir(n_geracoes=20)
     
     # Salvar o melhor indivíduo
     print("Salvando o melhor indivíduo...")
