@@ -758,19 +758,19 @@ class ProgramacaoGenetica:
                 
                 # Calcular fitness
                 fitness_tentativa = (
-                    robo.recursos_coletados * 100 +  # Aumentado o peso dos recursos
-                    robo.distancia_percorrida * 0.05 -  # Aumentado o peso da distância
-                    robo.colisoes * 50 -  # Aumentada a penalidade por colisões
-                    (100 - robo.energia) * 0.5 +  # Reduzida a penalidade por energia
-                    (800 if robo.meta_atingida else 0) +  # Bônus por atingir meta
-                    (15 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
+                    robo.recursos_coletados * 200 +  # Aumentado significativamente o peso dos recursos
+                    robo.distancia_percorrida * 0.02 -  # Reduzido o peso da distância para evitar movimento desnecessário
+                    robo.colisoes * 100 -  # Aumentada a penalidade por colisões para evitar comportamentos arriscados
+                    (100 - robo.energia) * 0.3 +  # Reduzida a penalidade por energia para permitir mais exploração
+                    (1000 if robo.meta_atingida else 0) +  # Aumentado o bônus por atingir meta
+                    (20 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Aumentado o bônus por eficiência temporal
                 )
                 
                 # Adicionar pontos extras por atingir a meta e continuar coletando recursos
                 if robo.meta_atingida:
-                    fitness_tentativa += 300  # Pontos extras por atingir a meta
+                    fitness_tentativa += 300  # Aumentado o bônus por atingir a meta
                     # Bônus adicional por coletar recursos após atingir a meta
-                    fitness_tentativa += robo.recursos_coletados * 200
+                    fitness_tentativa += robo.recursos_coletados * 300  # Aumentado o bônus por recursos após meta
                 
                 fitness += max(0, fitness_tentativa)
             
@@ -784,7 +784,7 @@ class ProgramacaoGenetica:
     def selecionar(self):
         # MÉTODO DE SELEÇÃO PARA O ALUNO MODIFICAR
         # Seleção por torneio
-        tamanho_torneio = 5  # Aumentado o tamanho do torneio
+        tamanho_torneio = 7  # Aumentado o tamanho do torneio para seleção mais rigorosa
         selecionados = []
         
         for _ in range(self.tamanho_populacao):
@@ -798,7 +798,7 @@ class ProgramacaoGenetica:
         for geracao in range(n_geracoes):
             print(f"Geração {geracao + 1}/{n_geracoes}")
             # Calcular probabilidade de mutação adaptativa
-            prob_mutacao = 0.3 - (0.25 * geracao / (n_geracoes - 1))
+            prob_mutacao = 0.4 - (0.35 * geracao / (n_geracoes - 1))  # Aumentada a probabilidade inicial e a redução
             # Avaliar população
             self.avaliar_populacao()
             self.historico_fitness.append(self.melhor_fitness)
