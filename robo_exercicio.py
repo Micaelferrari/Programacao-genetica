@@ -219,8 +219,10 @@ class Robo:
         if ambiente.verificar_colisao(novo_x, novo_y, self.raio):
             self.colisoes += 1
             self.velocidade = 0.1  # Mantém velocidade mínima mesmo após colisão
-            # Tenta uma direção diferente após colisão
-            self.angulo += random.uniform(-np.pi/4, np.pi/4)
+            # Inverte a direção (180 graus) após colisão
+            self.angulo = self.angulo + np.pi  # Rotação de 180 graus
+            # Pequena variação para evitar ciclos de colisão
+            self.angulo += random.uniform(-np.pi/8, np.pi/8)
         else:
             # Atualizar posição
             self.distancia_percorrida += np.sqrt((novo_x - self.x)**2 + (novo_y - self.y)**2)
@@ -649,13 +651,13 @@ class IndividuoPG:
         elif no['operador'] == 'min':
             return min(esquerda, direita)
         elif no['operador'] == 'sin':
-            return np.sin(self.avaliar_no(no['esquerda'], sensores))
+            return np.sin(esquerda)
         elif no['operador'] == 'cos':
-            return np.cos(self.avaliar_no(no['esquerda'], sensores))
+            return np.cos(esquerda)
         elif no['operador'] == 'sigmoid':
-            return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
+            return self.sigmoid(esquerda)
         elif no['operador'] == 'tanh':
-            return self.tanh(self.avaliar_no(no['esquerda'], sensores))
+            return self.tanh(esquerda)
     
     def mutacao(self, probabilidade=0.1):
         # PROBABILIDADE DE MUTAÇÃO PARA O ALUNO MODIFICAR
