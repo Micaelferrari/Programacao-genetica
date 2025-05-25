@@ -671,12 +671,21 @@ class IndividuoPG:
         novo.arvore_rotacao = self.crossover_no(self.arvore_rotacao, outro.arvore_rotacao)
         return novo
     
-    def crossover_no(self, no1, no2):
+    def crossover_no(self, no1, no2, profundidade_atual=0):
         # PROBABILIDADE DE CROSSOVER PARA O ALUNO MODIFICAR
-        if random.random() < 0.5:
-            return no1.copy()
+        max_profundidade = 6
+        prob_crossover = 0.7 * (1 - profundidade_atual / max_profundidade)  # Reduz com profundidade
+        if random.random() < prob_crossover or (no1 is None or no2 is None):
+            return json.loads(json.dumps(no1))
+        elif no1['tipo'] == 'operador' and no2['tipo'] == 'operador':
+            return {
+                'tipo': 'operador',
+                'operador': no1['operador'],
+                'esquerda': self.crossover_no(no1['esquerda'], no2['esquerda'], profundidade_atual + 1),
+                'direita': self.crossover_no(no1['direita'], no2['direita'], profundidade_atual + 1) if no1['direita'] is not None and no2['direita'] is not None else None
+            }
         else:
-            return no2.copy()
+            return json.loads(json.dumps(no2))
     
     def salvar(self, arquivo):
         with open(arquivo, 'w') as f:
