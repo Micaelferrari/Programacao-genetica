@@ -5,6 +5,7 @@ import matplotlib.patches as patches
 import matplotlib.animation as animation
 import json
 import time
+import copy
 
 # =====================================================================
 # PARTE 1: ESTRUTURA DA SIMULAÇÃO (NÃO MODIFICAR)
@@ -540,6 +541,9 @@ class IndividuoPG:
         self.arvore_aceleracao = self.criar_arvore_aleatoria()
         self.arvore_rotacao = self.criar_arvore_aleatoria()
         self.fitness = 0
+        # Cache para otimização de performance
+        self._cache_sensores = {}
+        self._ultimo_hash_sensores = None
     
     def criar_arvore_aleatoria(self):
         if self.profundidade == 0:
@@ -604,9 +608,34 @@ class IndividuoPG:
                 'variavel': tipo
             }
     
+    def _gerar_hash_sensores(self, sensores):
+        """Gera um hash dos sensores para cache"""
+        # Converte valores para uma tupla hasheable
+        valores = tuple(round(v, 6) if isinstance(v, float) else v for v in sensores.values())
+        return hash(valores)
+    
     def avaliar(self, sensores, tipo='aceleracao'):
+        # Cache de sensores - Melhoria #2
+        hash_sensores = self._gerar_hash_sensores(sensores)
+        cache_key = (hash_sensores, tipo)
+        
+        # Se já calculamos para estes sensores, retorna do cache
+        if cache_key in self._cache_sensores:
+            return self._cache_sensores[cache_key]
+        
         arvore = self.arvore_aceleracao if tipo == 'aceleracao' else self.arvore_rotacao
-        return self.avaliar_no(arvore, sensores)
+        resultado = self.avaliar_no(arvore, sensores)
+        
+        # Armazena no cache
+        self._cache_sensores[cache_key] = resultado
+        
+        # Limita o tamanho do cache para evitar uso excessivo de memória
+        if len(self._cache_sensores) > 1000:
+            # Remove metade dos itens mais antigos
+            items = list(self._cache_sensores.items())
+            self._cache_sensores = dict(items[500:])
+        
+        return resultado
     
     def avaliar_no(self, no, sensores):
         if no is None:
@@ -632,6 +661,14 @@ class IndividuoPG:
                 return self.avaliar_no(no['direita'], sensores)
             else:
                 return 0
+        elif no['operador'] == 'sin':
+            return np.sin(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'cos':
+            return np.cos(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'sigmoid':
+            return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'tanh':
+            return self.tanh(self.avaliar_no(no['esquerda'], sensores))
         
         esquerda = self.avaliar_no(no['esquerda'], sensores)
         direita = self.avaliar_no(no['direita'], sensores) if no['direita'] is not None else 0
@@ -657,10 +694,16 @@ class IndividuoPG:
         elif no['operador'] == 'tanh':
             return self.tanh(self.avaliar_no(no['esquerda'], sensores))
     
+    def limpar_cache(self):
+        """Limpa o cache de sensores"""
+        self._cache_sensores.clear()
+    
     def mutacao(self, probabilidade=0.1):
         # PROBABILIDADE DE MUTAÇÃO PARA O ALUNO MODIFICAR
         self.mutacao_no(self.arvore_aceleracao, probabilidade)
         self.mutacao_no(self.arvore_rotacao, probabilidade)
+        # Limpa cache após mutação
+        self.limpar_cache()
     
     def mutacao_no(self, no, probabilidade):
         if random.random() < probabilidade:
@@ -688,7 +731,8 @@ class IndividuoPG:
         max_profundidade = 6
         prob_crossover = 0.7 * (1 - profundidade_atual / max_profundidade)  # Reduz com profundidade
         if random.random() < prob_crossover or (no1 is None or no2 is None):
-            return json.loads(json.dumps(no1))
+            # Melhoria #1: Substituir json por copy.deepcopy (muito mais rápido)
+            return copy.deepcopy(no1)
         elif no1['tipo'] == 'operador' and no2['tipo'] == 'operador':
             return {
                 'tipo': 'operador',
@@ -697,7 +741,8 @@ class IndividuoPG:
                 'direita': self.crossover_no(no1['direita'], no2['direita'], profundidade_atual + 1) if no1['direita'] is not None and no2['direita'] is not None else None
             }
         else:
-            return json.loads(json.dumps(no2))
+            # Melhoria #1: Substituir json por copy.deepcopy (muito mais rápido)
+            return copy.deepcopy(no2)
     
     def salvar(self, arquivo):
         with open(arquivo, 'w') as f:
@@ -730,6 +775,8 @@ class ProgramacaoGenetica:
         robo = Robo(ambiente.largura // 2, ambiente.altura // 2)
         
         for individuo in self.populacao:
+            # Limpa cache no início da avaliação para cada indivíduo
+            individuo.limpar_cache()
             fitness = 0
             
             # Simular 8 tentativas (aumentado de 5 para 8)
