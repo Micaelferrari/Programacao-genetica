@@ -767,12 +767,10 @@ class ProgramacaoGenetica:
         robo = Robo(ambiente.largura // 2, ambiente.altura // 2)
         
         for individuo in self.populacao:
-            # Limpa cache no início da avaliação para cada indivíduo
-            individuo.limpar_cache()
             fitness = 0
             
-            # Simular 8 tentativas (aumentado de 5 para 8)
-            for _ in range(8):
+            # Simular 10 tentativas (aumentado de 8 para 10)
+            for _ in range(10):
                 ambiente.reset()
                 robo.reset(ambiente.largura // 2, ambiente.altura // 2)
                 
@@ -795,25 +793,36 @@ class ProgramacaoGenetica:
                     if sem_energia or ambiente.passo():
                         break
                 
-                # Calcular fitness
+                # Calcular fitness com nova lógica
                 fitness_tentativa = (
-                    robo.recursos_coletados * 250 +  # Aumentado o peso dos recursos
-                    robo.distancia_percorrida * 0.01 -  # Reduzido o peso da distância
-                    robo.colisoes * 180 -  # Aumentada a penalidade por colisões
-                    (100 - robo.energia) * 0.2 +  # Reduzida a penalidade por energia
-                    (600 if robo.meta_atingida else 0) +  # Bônus por atingir meta
-                    (25 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
+                    robo.recursos_coletados * 300 +  # Aumentado o peso dos recursos
+                    robo.distancia_percorrida * 0.005 -  # Reduzido ainda mais o peso da distância
+                    robo.colisoes * 200 -  # Aumentada a penalidade por colisões
+                    (100 - robo.energia) * 0.15 +  # Reduzida a penalidade por energia
+                    (800 if robo.meta_atingida else 0) +  # Aumentado o bônus por atingir meta
+                    (30 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Aumentado o bônus por eficiência temporal
                 )
+                
+                # Bônus por comportamento eficiente
+                if robo.velocidade > 0.5:  # Bônus por manter velocidade adequada
+                    fitness_tentativa += 50
+                
+                if robo.energia > 50:  # Bônus por manter energia alta
+                    fitness_tentativa += 30
                 
                 # Adicionar pontos extras por atingir a meta e continuar coletando recursos
                 if robo.meta_atingida:
-                    fitness_tentativa += 400  # Pontos extras por atingir a meta
+                    fitness_tentativa += 500  # Aumentado o bônus por atingir a meta
                     # Bônus adicional por coletar recursos após atingir a meta
-                    fitness_tentativa += robo.recursos_coletados * 350
+                    fitness_tentativa += robo.recursos_coletados * 400
+                    
+                    # Bônus por manter energia alta após atingir a meta
+                    if robo.energia > 70:
+                        fitness_tentativa += 200
                 
                 fitness += max(0, fitness_tentativa)
             
-            individuo.fitness = fitness / 8  # Média das 8 tentativas
+            individuo.fitness = fitness / 10  # Média das 10 tentativas
             
             # Atualizar melhor indivíduo
             if individuo.fitness > self.melhor_fitness:
@@ -822,22 +831,27 @@ class ProgramacaoGenetica:
     
     def selecionar(self):
         # MÉTODO DE SELEÇÃO PARA O ALUNO MODIFICAR
-        # Seleção por torneio
-        tamanho_torneio = 8  # Aumentado o tamanho do torneio
+        # Seleção por torneio com elitismo
+        tamanho_torneio = 10  # Aumentado o tamanho do torneio
         selecionados = []
         
-        for _ in range(self.tamanho_populacao):
+        # Elitismo: manter os 5 melhores indivíduos
+        melhores = sorted(self.populacao, key=lambda x: x.fitness, reverse=True)[:5]
+        selecionados.extend(melhores)
+        
+        # Selecionar o resto da população por torneio
+        while len(selecionados) < self.tamanho_populacao:
             torneio = random.sample(self.populacao, tamanho_torneio)
             vencedor = max(torneio, key=lambda x: x.fitness)
             selecionados.append(vencedor)
         
         return selecionados
     
-    def evoluir(self, n_geracoes=20):
+    def evoluir(self, n_geracoes=25):  # Aumentado o número de gerações
         for geracao in range(n_geracoes):
             print(f"Geração {geracao + 1}/{n_geracoes}")
             # Calcular probabilidade de mutação adaptativa
-            prob_mutacao = 0.5 - (0.45 * geracao / (n_geracoes - 1))  # Aumentada a probabilidade inicial e a redução
+            prob_mutacao = 0.6 - (0.5 * geracao / (n_geracoes - 1))  # Aumentada a probabilidade inicial
             # Avaliar população
             self.avaliar_populacao()
             self.historico_fitness.append(self.melhor_fitness)
