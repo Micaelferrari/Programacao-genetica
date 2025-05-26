@@ -760,7 +760,7 @@ class ProgramacaoGenetica:
                 fitness_tentativa = (
                     robo.recursos_coletados * 250 +  # Aumentado o peso dos recursos
                     robo.distancia_percorrida * 0.01 -  # Reduzido o peso da distância
-                    robo.colisoes * 150 -  # Aumentada a penalidade por colisões
+                    robo.colisoes * 180 -  # Aumentada a penalidade por colisões
                     (100 - robo.energia) * 0.2 +  # Reduzida a penalidade por energia
                     (600 if robo.meta_atingida else 0) +  # Bônus por atingir meta
                     (25 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)  # Bônus por eficiência temporal
