@@ -1,3 +1,4 @@
+# Pedro Marazo, Tiago Malaquias, Mateus Werneck, Micael, Gabriel Cunha
 import numpy as np
 import random
 import matplotlib.pyplot as plt
