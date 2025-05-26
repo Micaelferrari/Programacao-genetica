@@ -685,14 +685,6 @@ class IndividuoPG:
             return max(esquerda, direita)
         elif no['operador'] == 'min':
             return min(esquerda, direita)
-        elif no['operador'] == 'sin':
-            return np.sin(self.avaliar_no(no['esquerda'], sensores))
-        elif no['operador'] == 'cos':
-            return np.cos(self.avaliar_no(no['esquerda'], sensores))
-        elif no['operador'] == 'sigmoid':
-            return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
-        elif no['operador'] == 'tanh':
-            return self.tanh(self.avaliar_no(no['esquerda'], sensores))
     
     def limpar_cache(self):
         """Limpa o cache de sensores"""
@@ -863,16 +855,413 @@ class ProgramacaoGenetica:
 # =====================================================================
 # PARTE 3: EXECUÇÃO DO PROGRAMA (PARA O ALUNO MODIFICAR)
 # Esta parte contém a execução do programa e os parâmetros finais.
+
+import multiprocessing as mp
+import concurrent.futures
+from functools import partial
+import time
+import psutil
+import os
+
+class IndividuoPGParalelizado:
+    """Versão do IndividuoPG otimizada para paralelização"""
+    
+    def __init__(self, profundidade=3):
+        self.profundidade = profundidade
+        self.arvore_aceleracao = self.criar_arvore_aleatoria()
+        self.arvore_rotacao = self.criar_arvore_aleatoria()
+        self.fitness = 0
+        # Removemos cache para evitar problemas de serialização entre processos
+    
+    def criar_arvore_aleatoria(self):
+        if self.profundidade == 0:
+            return self.criar_folha()
+        
+        operador = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo', 'sin', 'cos', 'sigmoid', 'tanh'])
+        if operador in ['+', '-', '*', '/', 'max', 'min']:
+            return {
+                'tipo': 'operador',
+                'operador': operador,
+                'esquerda': IndividuoPGParalelizado(self.profundidade - 1).arvore_aceleracao,
+                'direita': IndividuoPGParalelizado(self.profundidade - 1).arvore_aceleracao
+            }
+        elif operador == 'abs':
+            return {
+                'tipo': 'operador',
+                'operador': operador,
+                'esquerda': IndividuoPGParalelizado(self.profundidade - 1).arvore_aceleracao,
+                'direita': None
+            }
+        else:  # Operadores unários e condicionais
+            return {
+                'tipo': 'operador',
+                'operador': operador,
+                'esquerda': IndividuoPGParalelizado(self.profundidade - 1).arvore_aceleracao,
+                'direita': IndividuoPGParalelizado(self.profundidade - 1).arvore_aceleracao if operador in ['if_positivo', 'if_negativo'] else None
+            }
+
+    @staticmethod
+    def sigmoid(x):
+        if x >= 0:
+            z = np.exp(-x)
+            return 1 / (1 + z)
+        else:
+            z = np.exp(x)
+            return z / (1 + z)
+    
+    @staticmethod
+    def tanh(x):
+        return np.tanh(x)
+    
+    def criar_folha(self):
+        tipo = random.choice(['constante', 'dist_recurso', 'dist_obstaculo', 'dist_meta', 'angulo_recurso', 'angulo_meta', 'energia', 'velocidade', 'meta_atingida'])
+        if tipo == 'constante':
+            return {
+                'tipo': 'folha',
+                'valor': random.uniform(-5, 5)
+            }
+        else:
+            return {
+                'tipo': 'folha',
+                'variavel': tipo
+            }
+    
+    def avaliar(self, sensores, tipo='aceleracao'):
+        arvore = self.arvore_aceleracao if tipo == 'aceleracao' else self.arvore_rotacao
+        return self.avaliar_no(arvore, sensores)
+    
+    def avaliar_no(self, no, sensores):
+        if no is None:
+            return 0
+            
+        if no['tipo'] == 'folha':
+            if 'valor' in no:
+                return no['valor']
+            elif 'variavel' in no:
+                return sensores[no['variavel']]
+        
+        if no['operador'] == 'abs':
+            return abs(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'if_positivo':
+            valor = self.avaliar_no(no['esquerda'], sensores)
+            return self.avaliar_no(no['direita'], sensores) if valor > 0 and no['direita'] else 0
+        elif no['operador'] == 'if_negativo':
+            valor = self.avaliar_no(no['esquerda'], sensores)
+            return self.avaliar_no(no['direita'], sensores) if valor < 0 and no['direita'] else 0
+        elif no['operador'] == 'sin':
+            return np.sin(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'cos':
+            return np.cos(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'sigmoid':
+            return self.sigmoid(self.avaliar_no(no['esquerda'], sensores))
+        elif no['operador'] == 'tanh':
+            return self.tanh(self.avaliar_no(no['esquerda'], sensores))
+        
+        esquerda = self.avaliar_no(no['esquerda'], sensores)
+        direita = self.avaliar_no(no['direita'], sensores) if no['direita'] is not None else 0
+        
+        if no['operador'] == '+':
+            return esquerda + direita
+        elif no['operador'] == '-':
+            return esquerda - direita
+        elif no['operador'] == '*':
+            return esquerda * direita
+        elif no['operador'] == '/':
+            return esquerda / direita if direita != 0 else 0
+        elif no['operador'] == 'max':
+            return max(esquerda, direita)
+        elif no['operador'] == 'min':
+            return min(esquerda, direita)
+    
+    def mutacao(self, probabilidade=0.1):
+        self.mutacao_no(self.arvore_aceleracao, probabilidade)
+        self.mutacao_no(self.arvore_rotacao, probabilidade)
+    
+    def mutacao_no(self, no, probabilidade):
+        if random.random() < probabilidade:
+            if no['tipo'] == 'folha':
+                if 'valor' in no:
+                    no['valor'] = random.uniform(-5, 5)
+                elif 'variavel' in no:
+                    no['variavel'] = random.choice(['dist_recurso', 'dist_obstaculo', 'dist_meta', 'angulo_recurso', 'angulo_meta', 'energia', 'velocidade', 'meta_atingida'])
+            else:
+                no['operador'] = random.choice(['+', '-', '*', '/', 'max', 'min', 'abs', 'if_positivo', 'if_negativo', 'sin', 'cos', 'sigmoid', 'tanh'])
+        
+        if no['tipo'] == 'operador':
+            self.mutacao_no(no['esquerda'], probabilidade)
+            if no['direita'] is not None:
+                self.mutacao_no(no['direita'], probabilidade)
+    
+    def crossover(self, outro):
+        novo = IndividuoPGParalelizado(self.profundidade)
+        novo.arvore_aceleracao = self.crossover_no(self.arvore_aceleracao, outro.arvore_aceleracao)
+        novo.arvore_rotacao = self.crossover_no(self.arvore_rotacao, outro.arvore_rotacao)
+        return novo
+    
+    def crossover_no(self, no1, no2, profundidade_atual=0):
+        max_profundidade = 6
+        prob_crossover = 0.7 * (1 - profundidade_atual / max_profundidade)
+        if random.random() < prob_crossover or (no1 is None or no2 is None):
+            return copy.deepcopy(no1)
+        elif no1['tipo'] == 'operador' and no2['tipo'] == 'operador':
+            return {
+                'tipo': 'operador',
+                'operador': no1['operador'],
+                'esquerda': self.crossover_no(no1['esquerda'], no2['esquerda'], profundidade_atual + 1),
+                'direita': self.crossover_no(no1['direita'], no2['direita'], profundidade_atual + 1) if no1['direita'] is not None and no2['direita'] is not None else None
+            }
+        else:
+            return copy.deepcopy(no2)
+            
+    def salvar(self, arquivo):
+        with open(arquivo, 'w') as f:
+            json.dump({
+                'arvore_aceleracao': self.arvore_aceleracao,
+                'arvore_rotacao': self.arvore_rotacao
+            }, f)
+    
+    @classmethod
+    def carregar(cls, arquivo):
+        with open(arquivo, 'r') as f:
+            dados = json.load(f)
+            individuo = cls()
+            individuo.arvore_aceleracao = dados['arvore_aceleracao']
+            individuo.arvore_rotacao = dados['arvore_rotacao']
+            return individuo
+
+
+def avaliar_individuo_worker(individuo, num_tentativas=8, seed_offset=0):
+    """
+    Função worker para avaliar um indivíduo em processo separado
+    """
+    # Importações locais para evitar problemas de serialização
+    import random
+    import numpy as np
+    
+    # Seed único para cada worker
+    random.seed(random.randint(0, 1000000) + seed_offset)
+    np.random.seed(random.randint(0, 1000000) + seed_offset)
+    
+    try:
+        # Inicializa ambiente e robô localmente para cada worker
+        ambiente = Ambiente()
+        robo = Robo(ambiente.largura // 2, ambiente.altura // 2)
+        
+        fitness_total = 0
+        
+        for _ in range(num_tentativas):
+            ambiente.reset()
+            robo.reset(ambiente.largura // 2, ambiente.altura // 2)
+            
+            while True:
+                sensores = robo.get_sensores(ambiente)
+                aceleracao = individuo.avaliar(sensores, 'aceleracao')
+                rotacao = individuo.avaliar(sensores, 'rotacao')
+                
+                aceleracao = max(-1, min(1, aceleracao))
+                rotacao = max(-0.5, min(0.5, rotacao))
+                
+                sem_energia = robo.mover(aceleracao, rotacao, ambiente)
+                
+                if sem_energia or ambiente.passo():
+                    break
+            
+            fitness_tentativa = (
+                robo.recursos_coletados * 250 +
+                robo.distancia_percorrida * 0.01 -
+                robo.colisoes * 150 -
+                (100 - robo.energia) * 0.2 +
+                (600 if robo.meta_atingida else 0) +
+                (25 * (ambiente.max_tempo - ambiente.tempo) if robo.meta_atingida else 0)
+            )
+            
+            if robo.meta_atingida:
+                fitness_tentativa += 400 + robo.recursos_coletados * 350
+            
+            fitness_total += max(0, fitness_tentativa)
+        
+        return fitness_total / num_tentativas
+    
+    except Exception as e:
+        print(f"Erro na avaliação do indivíduo: {e}")
+        return 0
+
+
+def avaliar_batch_individuos(individuos_batch, num_tentativas=8):
+    """
+    Avalia um lote de indivíduos em paralelo usando threads
+    """
+    resultados = []
+    for i, individuo in enumerate(individuos_batch):
+        fitness = avaliar_individuo_worker(individuo, num_tentativas, i)
+        resultados.append(fitness)
+    return resultados
+
+
+class ProgramacaoGeneticaParalelizada:
+    def __init__(self, tamanho_populacao=150, profundidade=5, num_processos=None):
+        self.tamanho_populacao = tamanho_populacao
+        self.profundidade = profundidade
+        
+        # Determinar número de processos automaticamente
+        if num_processos is None:
+            self.num_processos = max(1, mp.cpu_count() - 1)  # Deixa 1 CPU livre
+        else:
+            self.num_processos = num_processos
+        
+        print(f"Usando {self.num_processos} processos para paralelização")
+        
+        self.populacao = [IndividuoPGParalelizado(profundidade) for _ in range(tamanho_populacao)]
+        self.melhor_individuo = None
+        self.melhor_fitness = float('-inf')
+        self.historico_fitness = []
+        self.tempos_avaliacao = []
+    
+    def avaliar_populacao(self):
+        """
+        Avaliação usando multiprocessing para tarefas intensivas em CPU
+        """
+        inicio = time.time()
+        
+        # Dividir população em chunks para cada processo
+        chunk_size = max(1, len(self.populacao) // self.num_processos)
+        chunks = [self.populacao[i:i + chunk_size] for i in range(0, len(self.populacao), chunk_size)]
+        
+        try:
+            with mp.Pool(processes=self.num_processos) as pool:
+                # Mapear função de avaliação para cada chunk
+                resultados_chunks = pool.map(
+                    partial(avaliar_batch_individuos, num_tentativas=8),
+                    chunks
+                )
+                
+                # Flatten resultados e atribuir fitness
+                fitness_values = [f for chunk in resultados_chunks for f in chunk]
+                
+                # Atribuir fitness aos indivíduos
+                for i, individuo in enumerate(self.populacao):
+                    if i < len(fitness_values):
+                        individuo.fitness = fitness_values[i]
+                
+        except Exception as e:
+            print(f"Erro na avaliação paralela: {e}")
+            # Fallback para avaliação sequencial
+            self.avaliar_populacao_sequencial()
+        
+        tempo_decorrido = time.time() - inicio
+        self.tempos_avaliacao.append(tempo_decorrido)
+        
+        # Atualizar melhor indivíduo
+        self.atualizar_melhor_individuo()
+        
+        print(f"Avaliação paralela concluída em {tempo_decorrido:.2f}s")
+    
+    def avaliar_populacao_sequencial(self):
+        """
+        Avaliação sequencial como fallback
+        """
+        inicio = time.time()
+        
+        for i, individuo in enumerate(self.populacao):
+            individuo.fitness = avaliar_individuo_worker(individuo, 8, i)
+        
+        tempo_decorrido = time.time() - inicio
+        self.tempos_avaliacao.append(tempo_decorrido)
+        
+        self.atualizar_melhor_individuo()
+        
+        print(f"Avaliação sequencial concluída em {tempo_decorrido:.2f}s")
+    
+    def atualizar_melhor_individuo(self):
+        """Atualiza o melhor indivíduo da população atual"""
+        for individuo in self.populacao:
+            if individuo.fitness > self.melhor_fitness:
+                self.melhor_fitness = individuo.fitness
+                self.melhor_individuo = copy.deepcopy(individuo)
+    
+    def selecionar(self):
+        """Seleção por torneio"""
+        tamanho_torneio = 8
+        selecionados = []
+        
+        for _ in range(self.tamanho_populacao):
+            torneio = random.sample(self.populacao, tamanho_torneio)
+            vencedor = max(torneio, key=lambda x: x.fitness)
+            selecionados.append(vencedor)
+        
+        return selecionados
+    
+    def evoluir(self, n_geracoes=20):
+        """
+        Executa o algoritmo genético com paralelização
+        """
+        print(f"Iniciando evolução com {n_geracoes} gerações usando processamento paralelo")
+        print(f"CPU Count: {mp.cpu_count()}, Processos: {self.num_processos}")
+        print(f"Uso de memória: {psutil.Process().memory_info().rss / 1024 / 1024:.1f} MB")
+        
+        for geracao in range(n_geracoes):
+            print(f"\nGeração {geracao + 1}/{n_geracoes}")
+            
+            # Probabilidade de mutação adaptativa
+            prob_mutacao = 0.5 - (0.45 * geracao / max(1, n_geracoes - 1))
+            
+            # Avaliar população (paralelizado)
+            self.avaliar_populacao()
+            
+            # Registrar progresso
+            self.historico_fitness.append(self.melhor_fitness)
+            
+            # Estatísticas da geração
+            fitness_medio = sum(ind.fitness for ind in self.populacao) / len(self.populacao)
+            
+            print(f"Melhor fitness: {self.melhor_fitness:.2f}")
+            print(f"Fitness médio: {fitness_medio:.2f}")
+            print(f"Tempo de avaliação: {self.tempos_avaliacao[-1]:.2f}s")
+            
+            # Seleção e reprodução
+            selecionados = self.selecionar()
+            nova_populacao = [copy.deepcopy(self.melhor_individuo)]  # Elitismo
+            
+            # Geração da nova população
+            while len(nova_populacao) < self.tamanho_populacao:
+                pai1, pai2 = random.sample(selecionados, 2)
+                filho = pai1.crossover(pai2)
+                filho.mutacao(probabilidade=prob_mutacao)
+                nova_populacao.append(filho)
+            
+            self.populacao = nova_populacao
+        
+        # Estatísticas finais
+        tempo_total = sum(self.tempos_avaliacao)
+        tempo_medio = tempo_total / len(self.tempos_avaliacao)
+        
+        print(f"\n=== ESTATÍSTICAS FINAIS ===")
+        print(f"Tempo total de avaliação: {tempo_total:.2f}s")
+        print(f"Tempo médio por geração: {tempo_medio:.2f}s")
+        print(f"Melhor fitness final: {self.melhor_fitness:.2f}")
+        
+        return self.melhor_individuo, self.historico_fitness
+
+# =====================================================================
+# PARTE 4: EXECUÇÃO DO PROGRAMA PARALELIZADO
+# Esta parte contém a execução do programa com paralelização
 # =====================================================================
 
 # Executando o algoritmo
 if __name__ == "__main__":
-    print("Iniciando simulação de robô com programação genética...")
+    print("Iniciando simulação de robô com programação genética paralelizada...")
     
     # Criar e treinar o algoritmo genético
-    print("Treinando o algoritmo genético...")
-    # PARÂMETROS PARA O ALUNO MODIFICAR
-    pg = ProgramacaoGenetica(tamanho_populacao=150, profundidade=5)
+    print("Treinando o algoritmo genético paralelizado...")
+    
+    # Criar instância do algoritmo paralelizado
+    pg = ProgramacaoGeneticaParalelizada(
+        tamanho_populacao=150,
+        profundidade=5,
+        num_processos=None  # Auto-detectar número de CPUs
+    )
+    
+    # Evoluir usando paralelização baseada em processos
     melhor_individuo, historico = pg.evoluir(n_geracoes=20)
     
     # Salvar o melhor indivíduo
@@ -887,6 +1276,16 @@ if __name__ == "__main__":
     plt.xlabel('Geração')
     plt.ylabel('Fitness')
     plt.savefig('evolucao_fitness_robo.png')
+    plt.close()
+    
+    # Plotar estatísticas de tempo
+    plt.figure(figsize=(10, 5))
+    plt.plot(pg.tempos_avaliacao)
+    plt.title('Tempo de Avaliação por Geração')
+    plt.xlabel('Geração')
+    plt.ylabel('Tempo (s)')
+    plt.grid(True)
+    plt.savefig('estatisticas_evolucao.png')
     plt.close()
     
     # Simular o melhor indivíduo
